@@ -1,3 +1,6 @@
+###############   Set Working directory  ####################
+#######################################################
+setwd("~/econservation/eConservation_March2016")
 
 ###############   Needed Packages  ####################
 #######################################################
@@ -53,82 +56,62 @@ trim_punct <- function (x) gsub("([,;])$", "", x)
 #######################################################
 #######################################################
 
+#######################################################
+# I. Access, filter and clean the World Bank data
 
-
-
-# Load the existing eConservation main tables and lookup tables
-load("E:/bicheor/Working/New_data_structure/R_database/R_workspaces/R_database_econservation_tables.RData")
-
-
-
-# Load the data from the website
+# I.1. Load the data from the website
 wb_web <- read.csv("http://search.worldbank.org/api/projects/all.csv",  header=T, sep=",", quote = "", na.strings = "NA", colClasses="character")
-## Subset only projects about Biodiversity
+
+# I.2. Filter the data
+## I.2.1. Subset only projects about Biodiversity
 wb_web_biodiv <- wb_web[with(wb_web, grepl("Biodiversity",theme1)|grepl("Biodiversity", theme2)|grepl("Biodiversity", theme3)|
                                grepl("Biodiversity", theme4)|grepl("Biodiversity", theme5)|grepl("Biodiversity", theme)),]
-## Convert empty fields to NA
-wb_web_biodiv[wb_web_biodiv==''] <- NA
-## Remove projects that have been dropped or are still in the pipeline
+## I.2.2. Remove projects that have been dropped or are still in the pipeline
 wb_web_biodiv <- subset(wb_web_biodiv, wb_web_biodiv$status %in% c("Active", "Closed"))
-## Remove unnecessary variables
-wb_web_biodiv <- wb_web_biodiv[,-c(4:11, 14, 17:20, 24:30, 32:36, 44:50, 51,57)]
-## Aggregate the theme variables into one
-wb_web_biodiv$theme <- paste(wb_web_biodiv$theme1, wb_web_biodiv$theme2, wb_web_biodiv$theme3, wb_web_biodiv$theme4, wb_web_biodiv$theme5, sep=";")
-wb_web_biodiv$theme1 <- NULL
-wb_web_biodiv$theme2 <- NULL 
-wb_web_biodiv$theme3 <- NULL
-wb_web_biodiv$theme4 <- NULL
-wb_web_biodiv$theme5 <- NULL
-## Rename variables
-wb_web_biodiv <- rename(wb_web_biodiv, replace=c("id"="id_proj_from_provider",
+## I.2.3. Extract only the projects starting in 2010-2015
+# wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$project_start_date>="2010-01-01")
+wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$project_start_date>="2010-01-01" & wb_web_biodiv$project_start_date<="2016-02-01")
+
+# I.3. Clean the data
+## I.3.1. Remove unnecessary variables
+wb_web_biodiv_10_15 <- wb_web_biodiv_10_15[,-c(4:11, 14, 17:20, 24:30, 32:36, 44:50, 51,57)]
+## I.3.2. Convert empty fields to NA
+wb_web_biodiv_10_15[wb_web_biodiv_10_15==''] <- NA
+## I.3.3. Aggregate the theme variables into one
+wb_web_biodiv_10_15$theme <- paste(wb_web_biodiv_10_15$theme1, wb_web_biodiv_10_15$theme2, wb_web_biodiv_10_15$theme3, wb_web_biodiv_10_15$theme4, wb_web_biodiv_10_15$theme5, sep=";")
+wb_web_biodiv_10_15$theme1 <- NULL
+wb_web_biodiv_10_15$theme2 <- NULL 
+wb_web_biodiv_10_15$theme3 <- NULL
+wb_web_biodiv_10_15$theme4 <- NULL
+wb_web_biodiv_10_15$theme5 <- NULL
+## I.3.4. Rename variables
+wb_web_biodiv_10_15 <- rename(wb_web_biodiv_10_15, replace=c("id"="id_proj_from_provider",
                                                  "project_name"="title",
                                                  "boardapprovaldate"="project_start_date",
                                                  "closingdate"="project_end_date",
                                                  "lendprojectcost"="budget",
                                                  "url"="proj_link"))
-## Add the update date, the provider and the user name
-wb_web_biodiv$provider <- "World Bank"
-wb_web_biodiv$puser <- "BdB,OB"
-wb_web_biodiv$update_date <- "2016-02-02"
-wb_web_biodiv$currency <- "USD"
-## Convert date variables to date format
-wb_web_biodiv$project_start_date <- gsub("T00:00:00Z", "", wb_web_biodiv$project_start_date)
-wb_web_biodiv$project_end_date <- gsub("T00:00:00Z", "", wb_web_biodiv$project_end_date)  
-wb_web_biodiv$project_start_date <- as.Date(wb_web_biodiv$project_start_date, "%Y-%m-%d")
-wb_web_biodiv$project_end_date <- as.Date(wb_web_biodiv$project_end_date, "%Y-%m-%d")  
-wb_web_biodiv$update_date <- as.Date(wb_web_biodiv$update_date, "%Y-%m-%d")  
-
-## Remove semicolon in the budget variable
-wb_web_biodiv$budget <- as.numeric(gsub(";", "", wb_web_biodiv$budget))
-
-## Within some variables, the information if duplicated. Keep only one 
-wb_web_biodiv$countryname <- as.character(wb_web_biodiv$countryname)
-s <- (strsplit(wb_web_biodiv$countryname, split = ";"))
-temp <- data.frame(id_proj_from_provider = rep(wb_web_biodiv$id_proj_from_provider, sapply(s, length)), countryname = unlist(s))
+## I.3.5. Convert date variables to date format
+wb_web_biodiv_10_15$project_start_date <- gsub("T00:00:00Z", "", wb_web_biodiv_10_15$project_start_date)
+wb_web_biodiv_10_15$project_end_date <- gsub("T00:00:00Z", "", wb_web_biodiv_10_15$project_end_date)  
+wb_web_biodiv_10_15$project_start_date <- as.Date(wb_web_biodiv_10_15$project_start_date, "%Y-%m-%d")
+wb_web_biodiv_10_15$project_end_date <- as.Date(wb_web_biodiv_10_15$project_end_date, "%Y-%m-%d")  
+## I.3.6. Remove semicolon in the budget variable
+wb_web_biodiv_10_15$budget <- as.numeric(gsub(";", "", wb_web_biodiv_10_15$budget))
+## I.3.7. Within some variables, the information if duplicated. Keep only one 
+wb_web_biodiv_10_15$countryname <- as.character(wb_web_biodiv_10_15$countryname)
+s <- (strsplit(wb_web_biodiv_10_15$countryname, split = ";"))
+temp <- data.frame(id_proj_from_provider = rep(wb_web_biodiv_10_15$id_proj_from_provider, sapply(s, length)), countryname = unlist(s))
 temp <- temp[!duplicated(temp),]
-wb_web_biodiv$countryname <- NULL
-wb_web_biodiv <- merge(wb_web_biodiv, temp, by="id_proj_from_provider", all=T)
-
-## Check for missing values
-missing_wb_web_biodiv <- propmiss(wb_web_biodiv)
-
-
-
-# Extract only projects starting in 2010-2015
-# wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$project_start_date>="2010-01-01")
-wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$project_start_date>="2010-01-01" & wb_web_biodiv$project_start_date<="2016-02-01")
-## Check for missing values
-missing_wb_web_biodiv_10_15 <- propmiss(wb_web_biodiv_10_15)
-
-
-
-# Clean up of project titles
+wb_web_biodiv_10_15$countryname <- NULL
+wb_web_biodiv_10_15 <- merge(wb_web_biodiv_10_15, temp, by="id_proj_from_provider", all=T)
+## I.3.8. Clean up the project titles
 wb_web_biodiv_10_15$title <- gsub("Proejct", "Project", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("%th", "Fifth", wb_web_biodiv_10_15$title)
-wb_web_biodiv_10_15$title <- gsub("PIAU&#205;", "PIAUÍ", wb_web_biodiv_10_15$title)
+wb_web_biodiv_10_15$title <- gsub("PIAU&#205;", "PIAUÃ", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("CO Mainstreaming Sust. Cattle Ranching Project AF", "Colombia - Additional Financing for the Mainstreaming Sustainable Cattle Ranching Project", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title[c(41,59,86,113,115,122)] <- r_ucfirst(wb_web_biodiv_10_15$title[c(41,59,86,113,115,122)])
-wb_web_biodiv_10_15$title <- gsub("piauí", "Piauí", wb_web_biodiv_10_15$title)
+wb_web_biodiv_10_15$title <- gsub("piauÃ­", "PiauÃ­", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title[122] <- gsub("mali", "Mali", wb_web_biodiv_10_15$title[122])
 wb_web_biodiv_10_15$title <- gsub("Devt", "Development", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("AF", "Additional Financing", wb_web_biodiv_10_15$title)
@@ -137,21 +120,33 @@ wb_web_biodiv_10_15$title <- gsub("Svcs", "Services", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub(";", ",", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- trim_blank(wb_web_biodiv_10_15$title) # has to be done before trim_punct
 wb_web_biodiv_10_15$title <- trim_punct(wb_web_biodiv_10_15$title)
-
-### replace all pipes in the titles and descriptions of projects
-wb_web_biodiv_10_15$title <- gsub("\\|", " - ", wb_web_biodiv_10_15$title)
+wb_web_biodiv_10_15$title <- gsub("\\|", " - ", wb_web_biodiv_10_15$title) # replace all pipes in the titles so pipes can be used as a field separator
 wb_web_biodiv_10_15$title <- gsub("[\r\n]", "", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("\"", "", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("[\t]", "", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("N/A", NA, wb_web_biodiv_10_15$title)
 
+# I.4. Add the missing variable to resect the eConservation database structure
+## I.4.1. Add the update date, the provider and the user name
+wb_web_biodiv_10_15$provider <- "World Bank"
+wb_web_biodiv_10_15$puser <- "BdB,OB"
+wb_web_biodiv_10_15$currency <- "USD"
+wb_web_biodiv_10_15$update_date <- "2016-02-02"
+## I.4.2. Create a unique numerical ID for the projects
+wb_web_biodiv_10_15$id_proj_from_postgres <- seq(1000000, 1000000-1+nrow(wb_web_biodiv_10_15)) 
+## I.4.3. Convert date variables to date format
+wb_web_biodiv_10_15$update_date <- as.Date(wb_web_biodiv_10_15$update_date, "%Y-%m-%d")  
 
+# I.5. Check for missing values
+missing_wb_web_biodiv_10_15 <- propmiss(wb_web_biodiv_10_15)
 
-
-# Clean up of dates
+# I.6. Complete the missing data
+## I.6.2. Complete the missing dates
 dates <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider" ,"project_start_date","project_end_date"))
 propmiss(dates) # Check for missing values
+# Date found in various parts of the online documents on the World Bank project page. 
 # When the missing dates were project end dates for additional financing for an existing project, the initial project end date was used if not clearly stated otherwise in the additional financing documentation.
+# When the information could not be found, the project start date was used
 dates_missing <- dates[is.na(dates$project_end_date),]
 wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider=="P112106"] <- as.Date("2014-10-18", "%Y-%m-%d")   
 wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider=="P116734"] <- as.Date("2013-06-30", "%Y-%m-%d")   
@@ -167,20 +162,15 @@ wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider==
 wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider=="P153721"] <- as.Date("2021-09-30", "%Y-%m-%d") # But documentation under P151102
 wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider=="P153958"] <- as.Date("2015-06-30", "%Y-%m-%d")  
 
-
-# Create a unique numerical ID for the projects
-wb_web_biodiv_10_15$id_proj_from_postgres <- seq(1000000, 1000000-1+nrow(wb_web_biodiv_10_15)) 
-
-write.table(wb_web_biodiv_10_15, "E:/bicheor/Working/New_data_structure/R_database/Main_tables/WB_2010_2015/data_all_projects_wb_10_15.csv",
+# I.7. Save the table as csv
+write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv",
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 
 
 
-
-
-
-# Create the PROJECT table
+#######################################################
+# II. Create the PROJECT table
 wb_web_biodiv_10_15_projects <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "title", 
                                                                      "project_start_date","project_end_date",
                                                                      "proj_link", "budget", "currency",
