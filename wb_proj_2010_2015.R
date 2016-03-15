@@ -163,7 +163,7 @@ wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider==
 wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider=="P153958"] <- as.Date("2015-06-30", "%Y-%m-%d")  
 
 # I.7. Save the table as csv
-write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv",
+write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv"),
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 
@@ -171,19 +171,20 @@ write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Mai
 
 #######################################################
 # II. Create the PROJECT table
+
+## II.1. Subset the variables needed
 wb_web_biodiv_10_15_projects <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "title", 
                                                                      "project_start_date","project_end_date",
                                                                      "proj_link", "budget", "currency",
                                                                      "update_date" , "puser","id_proj_from_postgres"))
+
+## II.2. Create the variables missing from the WB data needed because they are provided by other data providers
 wb_web_biodiv_10_15_projects$proj_summary <- NA
 wb_web_biodiv_10_15_projects$description <- NA
 wb_web_biodiv_10_15_projects$pcomments <- NA
-## Link the projects to the existing ID in Bowy's database
-codes_wb <- read.csv("E:/bicheor/econservation/Database_2014/proj_codes/proj_codes_worldbank.csv", header=T)
-wb_web_biodiv_10_15_projects <- merge(wb_web_biodiv_10_15_projects, codes_wb, by="id_proj_from_provider", all.x=T, all.y=F)
-wb_web_biodiv_10_15_projects$proj_title <- NULL
-## Save the project table
-write.table(wb_web_biodiv_10_15_projects, "E:/bicheor/Working/New_data_structure/R_database/Main_tables/WB_2010_2015/wb_web_biodiv_10_15_projects.csv", 
+
+## II.3. Save the project table
+write.table(wb_web_biodiv_10_15_projects, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_10_15_projects.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 
@@ -191,11 +192,10 @@ write.table(wb_web_biodiv_10_15_projects, "E:/bicheor/Working/New_data_structure
 
 
 
+#######################################################
+# III. Create the IMPLEMENTING AGENCIES table
 
-
-
-
-# Clean up of implementing agencies names 
+## III.1.  Clean up the implementing agencies names 
 df_impl_agency <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider" ,"borrower","impl_agency"))
 ## More individual and in depth cleaning needs to be done in excel
 write.csv(df_impl_agency, "E:/bicheor/Working/New_data_structure/Temp/df_impl_agency.csv", row.names = F)
