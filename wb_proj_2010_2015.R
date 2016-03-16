@@ -56,6 +56,8 @@ trim_punct <- function (x) gsub("([,;])$", "", x)
 #######################################################
 #######################################################
 
+
+
 #######################################################
 # I. Access, filter and clean the World Bank data
 
@@ -132,7 +134,7 @@ wb_web_biodiv_10_15$provider <- "World Bank"
 wb_web_biodiv_10_15$puser <- "BdB,OB"
 wb_web_biodiv_10_15$currency <- "USD"
 wb_web_biodiv_10_15$update_date <- "2016-02-02"
-## I.4.2. Create a unique numerical ID for the projects
+## I.4.2. Create a unique numerical ID for the projects (starting from a number higher than the length of the current eConservation database to avoid duplicate ID)
 wb_web_biodiv_10_15$id_proj_from_postgres <- seq(1000000, 1000000-1+nrow(wb_web_biodiv_10_15)) 
 ## I.4.3. Convert date variables to date format
 wb_web_biodiv_10_15$update_date <- as.Date(wb_web_biodiv_10_15$update_date, "%Y-%m-%d")  
@@ -172,18 +174,18 @@ write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Mai
 #######################################################
 # II. Create the PROJECT table
 
-## II.1. Subset the variables needed
+# II.1. Subset the variables needed
 wb_web_biodiv_10_15_projects <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "title", 
                                                                      "project_start_date","project_end_date",
                                                                      "proj_link", "budget", "currency",
                                                                      "update_date" , "puser","id_proj_from_postgres"))
 
-## II.2. Create the variables missing from the WB data needed because they are provided by other data providers
+# II.2. Create the variables missing from the WB data needed because they are provided by other data providers
 wb_web_biodiv_10_15_projects$proj_summary <- NA
 wb_web_biodiv_10_15_projects$description <- NA
 wb_web_biodiv_10_15_projects$pcomments <- NA
 
-## II.3. Save the project table
+# II.3. Save the project table
 write.table(wb_web_biodiv_10_15_projects, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_10_15_projects.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
@@ -195,39 +197,29 @@ write.table(wb_web_biodiv_10_15_projects, paste(getwd(), "/eConservation_WB_2010
 #######################################################
 # III. Create the IMPLEMENTING AGENCIES table
 
-## III.1.  Clean up the implementing agencies names 
+# III.1.  Clean up the implementing agencies names 
+## III.1.1. A first cleaning of the names, one by one, needs to be done by hand in excel
 df_impl_agency <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider" ,"borrower","impl_agency"))
-## More individual and in depth cleaning needs to be done in excel
-write.csv(df_impl_agency, "E:/bicheor/Working/New_data_structure/Temp/df_impl_agency.csv", row.names = F)
-df_impl_agency <- read.csv("E:/bicheor/Working/New_data_structure/Temp/df_impl_agency.csv", na.strings = NA,
-                           header=T, sep=",", encoding="latin1") 
-## Include it back to the data
-wb_web_biodiv_10_15 <- merge(wb_web_biodiv_10_15, df_impl_agency, by="id_proj_from_provider", all.x=T)
+write.csv(df_impl_agency, paste(getwd(), "/Temp/df_impl_agency.csv"), row.names = F) # Export to excel
+df_impl_agency <- read.csv(paste(getwd(), "/Temp/df_impl_agency.csv"), na.strings = NA,
+                           header=T, sep=",", encoding="latin1")  # Load cleaned file from excel
+wb_web_biodiv_10_15 <- merge(wb_web_biodiv_10_15, df_impl_agency, by="id_proj_from_provider", all.x=T) # Include it back to the data
 
-## Decompose impl agencies as there is only one row per projects but it includes multiple sites --> lookup table
+# III.2. Create the implementing agencies table. 
+## III.2.1. Decompose the implementing agencies name variable to have only one row per projects-implementing agency conbination
 df_impl_agency$impl_agency <- as.character(df_impl_agency$impl_agency)
 s <- (strsplit(as.character(df_impl_agency$impl_agency), split = ";"))
-wb_web_biodiv_lt_proj_agency <- data.frame(id_proj_from_provider = rep(df_impl_agency$id_proj_from_provider, sapply(s, length)), impl_agency = unlist(s))
+wb_web_biodiv_lt_proj_agency <- data.frame(id_proj_from_provider = rep(df_impl_agency$id_proj_from_provider, sapply(s, length)), impl_agency = unlist(s)) # This is the first step to the creation of the lookup table project - implementing agency
 wb_web_biodiv_lt_proj_agency$impl_agency <- trim_blank(wb_web_biodiv_lt_proj_agency$impl_agency)
-## Extract the unique implementing agencies from the lookup table
+## III.2.2. Extract the unique implementing agencies from the lookup table
 wb_web_biodiv_implementing_agency <- data.frame(impl_agency = unique(wb_web_biodiv_lt_proj_agency$impl_agency))
-## Complete the implementing agencies info in excel
-write.csv(wb_web_biodiv_implementing_agency, "E:/bicheor/Working/New_data_structure/Temp/wb_web_biodiv_implementing_agency.csv", row.names = F)
-wb_web_biodiv_implementing_agency <- read.csv("E:/bicheor/Working/New_data_structure/Temp/wb_web_biodiv_implementing_agency.csv", na.strings = NA,
+## III.2.3. Complete the implementing agencies information (acronym, website, address, etc.) by hand in excel
+write.csv(wb_web_biodiv_implementing_agency, paste(getwd(), "/Temp/wb_web_biodiv_implementing_agency.csv"), row.names = F)
+wb_web_biodiv_implementing_agency <- read.csv(paste(getwd(), "/Temp/wb_web_biodiv_implementing_agency.csv"), na.strings = NA,
                                               header=T, sep=",", encoding="latin1")
-
-## Add the new implementing agencies to the existing IMPLEMENTING AGENCIES table
+## III.2.4. Clean the implementing agencies table
 wb_web_biodiv_implementing_agency$impl_agency <- trim_blank(wb_web_biodiv_implementing_agency$impl_agency)
-same_implementing_agency <- merge(wb_web_biodiv_implementing_agency, implementing_agencies[,c(1:3,6)], by="impl_agency", all=F) # extract the WB agencies that are already in the IMPLEMENTING AGENCIES table
-old_implementing_agency <- subset(implementing_agencies, !implementing_agencies$id_impl_agency %in% same_implementing_agency$id_impl_agency) # remove these WB agencies from the IMPLEMENTING AGENCIES table
-new_implementing_agency <- merge(wb_web_biodiv_implementing_agency, implementing_agencies[,c(1:3,6)], by="impl_agency", all.x=T) # extract the WB agencies that are NOT already in the IMPLEMENTING AGENCIES table
-new_implementing_agency <- subset(new_implementing_agency, !new_implementing_agency$id_impl_agency %in% same_implementing_agency$id_impl_agency)
-new_implementing_agency$id_impl_agency <- seq(max(implementing_agencies$id_impl_agency)+1, max(implementing_agencies$id_impl_agency)+nrow(new_implementing_agency)) # extract the WB agencies
-implementing_agencies <- rbind.fill(old_implementing_agency, same_implementing_agency)
-implementing_agencies <- rbind.fill(implementing_agencies, new_implementing_agency)
 implementing_agencies <- implementing_agencies[!duplicated(implementing_agencies),]
-
-## Clean the implementing agencies
 implementing_agencies <- rename(implementing_agencies, replace=c("comments"="acomments"))
 implementing_agencies$impl_agency <- gsub("\\|", " - ", implementing_agencies$impl_agency)
 implementing_agencies$acomments <- gsub("\\|", " - ", implementing_agencies$acomments)
@@ -245,18 +237,20 @@ implementing_agencies$impl_agency <- gsub("N/A", NA, implementing_agencies$impl_
 implementing_agencies$acomments <- gsub("N/A", NA, implementing_agencies$acomments)
 implementing_agencies$ngo_link <- gsub("N/A", NA, implementing_agencies$ngo_link)
 implementing_agencies$impl_agency <- trim_blank(implementing_agencies$impl_agency)
-write.table(implementing_agencies, "E:/bicheor/Working/New_data_structure/R_database/Main_tables/WB_2010_2015/implementing_agencies.csv", 
+## III.2.5. Save the implementing agencies table
+write.table(implementing_agencies, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/implementing_agencies.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
-## Comple the lookup table with the new implementing agencies id 
-wb_web_biodiv_lt_proj_agency <- merge(wb_web_biodiv_lt_proj_agency, implementing_agencies, by="impl_agency", all.x=T, all.y=F)
-table(is.na(wb_web_biodiv_lt_proj_agency$id_impl_agency)) # All implementing agencies are associated to an id
+# III.2. Create the  lookup table project - implementing agencies. 
+## III.2.1. Create a unique numerical ID for the implementing agencies (starting from a number higher than the length of the current eConservation database to avoid duplicate ID)
+wb_web_biodiv_lt_proj_agency$id_impl_agency <- seq(2000, 2000-1+nrow(wb_web_biodiv_lt_proj_agency)) 
+## III.2.2. Select only the ID variables and merge the table to the created numerical project ID
 wb_web_biodiv_lt_proj_agency <- subset(wb_web_biodiv_lt_proj_agency, select=c("id_proj_from_provider", "id_impl_agency"))
 wb_web_biodiv_lt_proj_agency <- merge(wb_web_biodiv_lt_proj_agency, 
                                       subset(wb_web_biodiv_10_15_projects, select=c(id_proj_from_provider, id_proj_from_postgres)), 
                                       by="id_proj_from_provider", all.x=T, all.y=F)
-table(is.na(wb_web_biodiv_lt_proj_agency))
-write.table(wb_web_biodiv_lt_proj_agency, "E:/bicheor/Working/New_data_structure/R_database/Lookup_tables/WB_2010_2015/wb_web_biodiv_lt_proj_agency.csv", 
+## III.2.3. Save the lookup table
+write.table(wb_web_biodiv_lt_proj_agency, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_agency.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
