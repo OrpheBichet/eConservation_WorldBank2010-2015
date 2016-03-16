@@ -312,6 +312,8 @@ write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 
+
+#####################  #####################  #####################  #####################  #####################  
 ## Associate sites with the wdpa id when applicable
 #####################  SEE GetSiteWDPA.R
 
@@ -344,7 +346,8 @@ write.table(wb_web_biodiv_lt_sites_wdpa, "E:/bicheor/Working/New_data_structure/
 #                                                             "link_to_si"="link_to_site", "id_site_fr"="id_site_from_postgres"))
 #wb_web_biodiv_sites$coords_x1 <- NULL
 #wb_web_biodiv_sites$coords_x2 <- NULL
-#####################  
+#####################  #####################  #####################  #####################  #####################  #####################  
+
 
 
 # IV.3. Create the lookup table projects - sites
@@ -371,172 +374,117 @@ write.table(wb_web_biodiv_lt_proj_sites, paste(getwd(),"/eConservation_WB_2010_2
 
 
 #######################################################
-# IV. Create the DONORS table
-# Find donors data (not specified in the web database)
-## Check if projects were associated to a donor in Bowy's database.
-is_donor <- merge(wb_web_biodiv_10_15, lt_proj_donors, by="id_proj_from_provider", all.x=T, all.y=F)
-propmiss(is_donor) # Check for missing values
-is_donor <- merge(is_donor, donors, by="id_donor", all.x=T, all.y=F) 
-# Project that were associated with donor were all given the World Bank as donor which is not correct.
-# The table was exported into excel and completed by hand by searching online documentation of projects on the WB website
-write.csv(is_donor, "E:/bicheor/Working/New_data_structure/Temp/is_donor.csv", row.names = F) # Export the project table
-wb_web_biodiv_donors <- read.csv("E:/bicheor/Working/New_data_structure/Temp/is_donor.csv",
-                                 na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table
-wb_web_biodiv_donors <- wb_web_biodiv_donors[,c(1,3)]
+# V. Create the DONORS table
 
-## Create the lookup table project-donors
+# V.1. The donor information was not specified in the WB donwload data. It was completed by hand by searching online documentation of projects on the WB website
+wb_web_biodiv_donors <- read.csv(paste(getwd(), "/Temp/wb_donor.csv",
+                                 na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the table with project ID and donor names that has been completed into Excel
+
+# V.2. Create the DONORS table
+## V.2.1. Decompose the coordinates variables (Latitude and Longitude) to have only one row per project-donor combination
 s <- (strsplit(as.character(wb_web_biodiv_donors$donor_name), split = ";"))
 wb_web_biodiv_lt_proj_donors <- data.frame(id_proj_from_provider = rep(wb_web_biodiv_donors$id_proj_from_provider, sapply(s, length)),
                                            donor_name = unlist(s))
-### Link it to the DONORS table
-wb_web_biodiv_lt_proj_donors <- merge(wb_web_biodiv_lt_proj_donors, donors, by="donor_name", all.x=T, all.y=F)
-### Extract the new donors and add them to the DONOR table
-new_donors <- wb_web_biodiv_lt_proj_donors[is.na(wb_web_biodiv_lt_proj_donors$id_donor),]
-new_donors <- subset(new_donors, select=-id_proj_from_provider)
-new_donors <- new_donors[!duplicated(new_donors),]
-new_donors$id_donor <- seq(max(donors$id_donor)+1, max(donors$id_donor)+nrow(new_donors)) 
-donors <- rbind.fill(donors, new_donors)
-
-#### The table was then exported into excel and completed by hand by searching information online
-write.csv(donors, "E:/bicheor/Working/New_data_structure/Temp/donors_to_complete.csv", row.names = F)
-donors <- read.csv("E:/bicheor/Working/New_data_structure/Temp/donors_to_complete.csv",
-                                 na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table
-
-## Clean donors for postgres
-donors$donor_name <- gsub("\\|", " - ", donors$donor_name)
-donors$address <- gsub("\\|", " - ", donors$address)
-donors$Description <- gsub("\\|", " - ", donors$Description)
-donors$donor_name <- gsub("[\r\n]", "", donors$donor_name)
-donors$address <- gsub("[\r\n]", "", donors$address)
-donors$Description <- gsub("[\r\n]", "", donors$Description)
-donors$donor_name <- gsub("\"", "", donors$donor_name)
-donors$address <- gsub("\"", "", donors$address)
-donors$Description <- gsub("\"", "", donors$Description)
-donors$donor_name <- gsub("[\t]", "", donors$donor_name)
-donors$address <- gsub("[\t]", "", donors$address)
-donors$Description <- gsub("[\t]", "", donors$Description)
-donors$donor_name <- gsub("N/A", NA, donors$donor_name)
-donors$address <- gsub("N/A", NA, donors$address)
-donors$Description <- gsub("N/A", NA, donors$Description)
-donors$date_oldest_project <- NA
-donors$date_latest_project <- NA
-
-write.table(donors, "E:/bicheor/Working/New_data_structure/R_database/Main_tables/WB_2010_2015/donors.csv", 
+## V.2.2. Extract the unique donors                                          
+wb_web_biodiv_donors <- unique(wb_web_biodiv_donors$donor_name)
+## V.2.3. Create a unique numerical ID for the donors (starting from a number higher than the length of the current eConservation database to avoid duplicate ID)
+wb_web_biodiv_donors$id_donor <- seq(150, 150-1+nrow(wb_web_biodiv_donors)) 
+## V.2.4. Complete the donors information (acronym, website, address, etc.) by hand in excel
+write.csv(wb_web_biodiv_donors, paste(getwd(), "/Temp/donors_to_complete.csv", row.names = F) # Export to Excel
+wb_web_biodiv_donors <- read.csv(paste(getwd(), "/Temp/donors_to_complete.csv",
+                                 na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table back
+## V.2.5. Clean donors
+wb_web_biodiv_donors$donor_name <- gsub("\\|", " - ", wb_web_biodiv_donors$donor_name)
+wb_web_biodiv_donors$address <- gsub("\\|", " - ", wb_web_biodiv_donors$address)
+wb_web_biodiv_donors$Description <- gsub("\\|", " - ", wb_web_biodiv_donors$Description)
+wb_web_biodiv_donors$donor_name <- gsub("[\r\n]", "", wb_web_biodiv_donors$donor_name)
+wb_web_biodiv_donors$address <- gsub("[\r\n]", "", wb_web_biodiv_donors$address)
+wb_web_biodiv_donors$Description <- gsub("[\r\n]", "", wb_web_biodiv_donors$Description)
+wb_web_biodiv_donors$donor_name <- gsub("\"", "", wb_web_biodiv_donors$donor_name)
+wb_web_biodiv_donors$address <- gsub("\"", "", wb_web_biodiv_donors$address)
+wb_web_biodiv_donors$Description <- gsub("\"", "", wb_web_biodiv_donors$Description)
+wb_web_biodiv_donors$donor_name <- gsub("[\t]", "", wb_web_biodiv_donors$donor_name)
+wb_web_biodiv_donors$address <- gsub("[\t]", "", wb_web_biodiv_donors$address)
+wb_web_biodiv_donors$Description <- gsub("[\t]", "", wb_web_biodiv_donors$Description)
+wb_web_biodiv_donors$donor_name <- gsub("N/A", NA, wb_web_biodiv_donors$donor_name)
+wb_web_biodiv_donors$address <- gsub("N/A", NA, wb_web_biodiv_donors$address)
+wb_web_biodiv_donors$Description <- gsub("N/A", NA, wb_web_biodiv_donors$Description)
+wb_web_biodiv_donors$date_oldest_project <- NA
+wb_web_biodiv_donors$date_latest_project <- NA
+## V.2.6. Save the DONORS table
+write.table(wb_web_biodiv_donors, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_donors.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
-
-## Comple the lookup table with the new donors id 
-wb_web_biodiv_lt_proj_donors <- wb_web_biodiv_lt_proj_donors[,1:3]
-wb_web_biodiv_lt_proj_donors <- merge(wb_web_biodiv_lt_proj_donors, donors, by="donor_name", all.x=T, all.y=F)
-wb_web_biodiv_lt_proj_donors <- subset(wb_web_biodiv_lt_proj_donors, select=c("id_proj_from_provider", "id_donor.y"))
-wb_web_biodiv_lt_proj_donors <- rename(wb_web_biodiv_lt_proj_donors, replace=c("id_donor.y"="id_donor"))
+# V.3. Create the lookup table projects - donors
+# V.3.1. Complete the table projects-donors with the new donor id 
+wb_web_biodiv_lt_proj_donors <- merge(wb_web_biodiv_lt_proj_donors, wb_web_biodiv_donors, by="donor_name", all.x=T, all.y=F)
+wb_web_biodiv_lt_proj_donors <- subset(wb_web_biodiv_lt_proj_donors, select=c("id_proj_from_provider", "id_donor"))
 wb_web_biodiv_lt_proj_donors <- merge(wb_web_biodiv_lt_proj_donors, 
                                       subset(wb_web_biodiv_10_15_projects, select=c(id_proj_from_provider, id_proj_from_postgres)), 
                                       by="id_proj_from_provider", all.x=T, all.y=F)
-table(is.na(wb_web_biodiv_lt_proj_donors))
-write.table(wb_web_biodiv_lt_proj_donors, "E:/bicheor/Working/New_data_structure/R_database/Lookup_tables/WB_2010_2015/wb_web_biodiv_lt_proj_donors.csv", 
+# V.3.2. Save the projects - donors lookup table
+write.table(wb_web_biodiv_lt_proj_donors,  paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_donors.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
 
 
-
-
-
-
-
-
-# Create the project - provider lookup table (id World Bank as a data provider is 10)
+#######################################################
+# VI. Create the project - provider lookup table
 wb_web_biodiv_lt_proj_provider <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres))
-wb_web_biodiv_lt_proj_provider$id_provider <- 10
+wb_web_biodiv_lt_proj_provider$id_provider <- 10  # the eConservation ID for the World Bank as a data provider is 10
 wb_web_biodiv_lt_proj_provider <- wb_web_biodiv_lt_proj_provider[!duplicated(wb_web_biodiv_lt_proj_provider),]
-write.table(wb_web_biodiv_lt_proj_provider, "E:/bicheor/Working/New_data_structure/R_database/Lookup_tables/WB_2010_2015/wb_web_biodiv_lt_proj_provider.csv", 
+write.table(wb_web_biodiv_lt_proj_provider, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_provider.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
-providers$Physical.address <- gsub("\\|", " - ", providers$Physical.address)
-providers$Description <- gsub("\\|", " - ", providers$Description)
-providers$Physical.address <- gsub("[\r\n]", "", providers$Physical.address)
-providers$Description <- gsub("[\r\n]", "", providers$Description)
-providers$Physical.address <- gsub("\"", "", providers$Physical.address)
-providers$Description <- gsub("\"", "", providers$Description)
-providers$Physical.address <- gsub("[\t]", "", providers$Physical.address)
-providers$Description <- gsub("[\t]", "", providers$Description)
-providers$Physical.address <- gsub("N/A", NA, providers$Physical.address)
-providers$Description <- gsub("N/A", NA, providers$Description)
-providers$Projects.recorded.by.the.data.provider <- NULL
+#######################################################
+# VII. Create the project - species lookup table
 
-providers <- rename(providers, replace=c(
-  "provider" ="provider_name_en",
-  "Link.to.data.provider.website" ="provider_link",
-  "Data.provider.type" ="provider_type",
-  "Country" ="country_origin",
-  "Physical.address" ="address",
-  "Phone.number" ="phone",
-  "General.email.address" ="email",
-  "Contact.person.1" ="Contact1",
-  "email.address.of.Contact.person.1"="emailContact1",
-  "Contact.person.2" ="Contact2",
-  "email.address.of.Contact.person.2"="emailContact2",
-  "Contact.person.3" ="Contact3",
-  "email.address.of.Contact.person.3"="emailContact3",
-  "Contact.person.4" ="Contact4",
-  "email.address.of.Contact.person.4"="emailContact4",
-  "Last.update" ="update_date",
-  "Time.spend" ="time_span",
-  "Quality.completeness.of.the.data" ="quality"
-))
-
-write.table(providers, "E:/bicheor/Working/New_data_structure/R_database/Main_tables/WB_2010_2015/providers.csv", 
-            row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
-
-
-
-
-
-
-
-
-
-  
-
-# Find target species data (not specified in the web database)
-## Create target species variables
+# VII.1. Create target species variables
 wb_web_biodiv_10_15$species_name <- NA
 wb_web_biodiv_10_15$iucn_species_id <- NA
 wb_web_biodiv_10_15$scientific_name <- NA
 
-## Complete with the species info.
-## From a visual scanning of the projects titles, only one had information about a specific species
+# VII.2. Complete the species data
+## VII.2.1. The target species was not clearly indicated in the WB download data. The information was searched trhough a visual scan of the projects titles
+### only one project had information about a specific target species
 wb_web_biodiv_10_15$species_name[wb_web_biodiv_10_15$id_proj_from_provider=="P113860"] <- "Tiger"
 wb_web_biodiv_10_15$scientific_name[wb_web_biodiv_10_15$id_proj_from_provider=="P113860"] <- "Panthera tigris"
 wb_web_biodiv_10_15$iucn_species_id[wb_web_biodiv_10_15$id_proj_from_provider=="P113860"] <- 15955
-write.table(wb_web_biodiv_10_15, "E:/bicheor/Working/New_data_structure/R_database/Main_tables/WB_2010_2015/data_all_projects_wb_10_15.csv", 
+## VII.2.1. Save the information ono the main data table
+write.table(wb_web_biodiv_10_15, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv", 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
-# Create the project - species lookup table 
+# VII.3. Create the project - species lookup table 
 wb_web_biodiv_lt_proj_species <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres, iucn_species_id))
 wb_web_biodiv_lt_proj_species <- wb_web_biodiv_lt_proj_species[!duplicated(wb_web_biodiv_lt_proj_species),]
-write.table(wb_web_biodiv_lt_proj_species, "E:/bicheor/Working/New_data_structure/R_database/Lookup_tables/WB_2010_2015/wb_web_biodiv_lt_proj_species.csv", 
+write.table(wb_web_biodiv_lt_proj_species, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_species.csv", 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
 
+#######################################################
+# VIII. Create the project - focus lookup table
 
+## VII.1. The project focus was not clearly indicated in the WB download data, but could be extracted by hand from the "title", “sector”, “mjsector” and “theme” variables.
+wb_web_biodiv_focus <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres, title, sector, mjsector, theme))
+write.table(wb_web_biodiv_focus, paste(getwd(), "/Temp/wb_web_biodiv_focus.csv", 
+            row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "NA") # Export table to Excel
+wb_web_biodiv_focus <- read.csv(paste(getwd(), "/Temp/wb_web_biodiv_focus.csv",
+                                 na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table back
 
+## VII.2. Create the project - IUCN category lookup table 
+wb_web_biodiv_lt_proj_category <- subset(wb_web_biodiv_focus, select=c(id_proj_from_provider, id_proj_from_postgres, iucn_cat_id))
+wb_web_biodiv_lt_proj_category <- wb_web_biodiv_lt_proj_category[!duplicated(wb_web_biodiv_lt_proj_category),]
+write.table(wb_web_biodiv_lt_proj_category, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_category.csv", 
+            row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
-
-
-
-
-# Find IUCN category data (not specified in the web database)
-## The categorisation was made by scanning the variables susceptible to give information in the following order: title, sector, mjsector, theme
-wb_web_biodiv_theme <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres, title, sector, mjsector, theme))
-write.table(wb_web_biodiv_theme, "E:/bicheor/Working/New_data_structure/Temp/wb_web_biodiv_theme.csv", row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "NA")
-
-
-
-
+## VII.3. Create the project - Aichi targets lookup table 
+wb_web_biodiv_lt_proj_aichi <- subset(wb_web_biodiv_focus, select=c(id_proj_from_provider, id_proj_from_postgres, aichi_id))
+wb_web_biodiv_lt_proj_aichi <- wb_web_biodiv_lt_proj_aichi[!duplicated(wb_web_biodiv_lt_proj_aichi),]
+write.table(wb_web_biodiv_lt_proj_aichi, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_aichi.csv", 
+            row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
 
