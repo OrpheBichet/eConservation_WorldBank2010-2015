@@ -311,61 +311,43 @@ wb_web_biodiv_sites$id_site_from_postgres <- seq(200000, 200000-1+nrow(wb_web_bi
 write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_sites.csv"), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
+# IV.3. Associate sites with countries and with WDPA, when applicable
+## IV.3.1. Refer to code GetSiteWDPA.R
+## IV.3.2. Clean the new SITES table 
+wb_web_biodiv_sites_POINTS <- readShapePoints(paste(getwd(),"/eConservation_GIS\WB_2010_2015_sites/wb_web_biodiv_sites_POINTS_MinDistWDPA.shp"))
+wb_web_biodiv_sites <- wb_web_biodiv_sites_POINTS@data
+wb_web_biodiv_sites <- rename(wb_web_biodiv_sites, replace=c("precision_"="precision_id", "wdpa_id"="inter_wdpaPOLY",
+                                                             "link_to_si"="link_to_site", "id_site_fr"="id_site_from_postgres"))
+wb_web_biodiv_sites$coords_x1 <- NULL
+wb_web_biodiv_sites$coords_x2 <- NULL
+## IV.3.3. Save the new SITES table
+write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_sites.csv"), 
+            row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
-
-#####################  #####################  #####################  #####################  #####################  
-## Associate sites with the wdpa id when applicable
-#####################  SEE GetSiteWDPA.R
-
-## Associate sites to the country they are located in
-map_countries <- readShapePoly("E:/bicheor/econservation/eConservation_March2016/eConservation_GIS/Coutries_and_marine_territories/gaul_eez_labels.shp")
-o = over(wb_web_biodiv_sites_POINTS, map_countries, returnList = T)
-for (j in 1:length(wb_web_biodiv_sites_POINTS)){
-  wb_web_biodiv_sites_POINTS@data$country[j] <- as.character(o[[j]]$countries_)
-}
-countries <- readShapePoly("E:/bicheor/econservation/eConservation_March2016/eConservation_GIS/ne_10m_admin_0_countries/ne_10m_admin_0_countries.shp")
-wb_web_biodiv_sites_POINTS@data <- merge(wb_web_biodiv_sites_POINTS@data, 
-                                         subset(countries@data, select=c(REGION_WB, ISO_A2, ECONOMY)),
-                                         by.x="country", by.y="ISO_A2", all.x=T, all.y=F)
-### Save the site point shapefile
-writeSpatialShape(wb_web_biodiv_sites_POINTS, "E:/bicheor/econservation/eConservation_March2016/eConservation_GIS/WB_2010_2015_sites/wb_web_biodiv_sites_POINTS_MinDistWDPA.shp")
-
-## Create the site-WDPA(polygons) lookup table 
-wb_web_biodiv_lt_sites_wdpa <- subset(wb_web_biodiv_sites, select=c(id_site_from_postgres, WDPAID))
-
-s5 <- (strsplit(as.character(wb_web_biodiv_lt_sites_wdpa$WDPAID), split = ","))
-wb_web_biodiv_lt_sites_wdpa <- data.frame(id_site_from_postgres = rep(wb_web_biodiv_lt_sites_wdpa$id_site_from_postgres, sapply(s5, length)),
-                                          WDPAID = unlist(s5))
-wb_web_biodiv_lt_sites_wdpa <- wb_web_biodiv_lt_sites_wdpa[!duplicated(wb_web_biodiv_lt_sites_wdpa),]
-wb_web_biodiv_lt_sites_wdpa$WDPAID <- as.numeric(as.character(wb_web_biodiv_lt_sites_wdpa$WDPAID))
-write.table(wb_web_biodiv_lt_sites_wdpa, "E:/bicheor/Working/New_data_structure/R_database/Lookup_tables/WB_2010_2015/wb_web_biodiv_lt_sites_wdpa.csv", row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
-
-#wb_web_biodiv_sites_POINTS <- readShapePoints("E:/bicheor/Working/New_data_structure/R_database/GIS/WB_2010_2015/wb_web_biodiv_sites_POINTS_MinDistWDPA.shp")
-#wb_web_biodiv_sites <- wb_web_biodiv_sites_POINTS@data
-#wb_web_biodiv_sites <- rename(wb_web_biodiv_sites, replace=c("precision_"="precision_id", "wdpa_id"="inter_wdpaPOLY",
-#                                                             "link_to_si"="link_to_site", "id_site_fr"="id_site_from_postgres"))
-#wb_web_biodiv_sites$coords_x1 <- NULL
-#wb_web_biodiv_sites$coords_x2 <- NULL
-#####################  #####################  #####################  #####################  #####################  #####################  
-
-
-
-# IV.3. Create the lookup table projects - sites
-## IV.3.1. Complete the table projects-sites with the new sites id 
+# IV.4. Create the lookup table projects - sites
+## IV.4.1. Complete the table projects-sites with the new sites id 
 wb_web_biodiv_lt_proj_sites <- wb_web_biodiv_lt_proj_sites[,1:3]
 wb_web_biodiv_lt_proj_sites <- merge(wb_web_biodiv_lt_proj_sites, 
                                      subset(wb_web_biodiv_sites, select=c(latitude, longitude, id_site_from_postgres)), 
                                      by=c("latitude","longitude"), all.x=T, all.y=F)
 wb_web_biodiv_lt_proj_sites <- wb_web_biodiv_lt_proj_sites[!is.na(wb_web_biodiv_lt_proj_sites$id_site_from_postgres),]
-## IV.3.2. Select only the ID variables and merge the table to the created numerical project ID
+## IV.4.2. Select only the ID variables and merge the table to the created numerical project ID
 wb_web_biodiv_lt_proj_sites <- subset(wb_web_biodiv_lt_proj_sites, select=c("id_proj_from_provider", "id_site_from_postgres"))
 wb_web_biodiv_lt_proj_sites <- wb_web_biodiv_lt_proj_sites[!duplicated(wb_web_biodiv_lt_proj_sites),]
 codes_wb_sites <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "id_proj_from_postgres"))
 wb_web_biodiv_lt_proj_sites <- merge(wb_web_biodiv_lt_proj_sites, codes_wb_sites, by="id_proj_from_provider", all.x=T, all.y=F)
-## IV.3.3. Save the projects-sites lookup table
+## IV.4.3. Save the projects-sites lookup table
 write.table(wb_web_biodiv_lt_proj_sites, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_sites.csv"), row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
+# IV.5. Create the site-WDPA lookup table 
+wb_web_biodiv_lt_sites_wdpa <- subset(wb_web_biodiv_sites, select=c(id_site_from_postgres, WDPAID))
+s5 <- (strsplit(as.character(wb_web_biodiv_lt_sites_wdpa$WDPAID), split = ","))
+wb_web_biodiv_lt_sites_wdpa <- data.frame(id_site_from_postgres = rep(wb_web_biodiv_lt_sites_wdpa$id_site_from_postgres, sapply(s5, length)),
+                                          WDPAID = unlist(s5))
+wb_web_biodiv_lt_sites_wdpa <- wb_web_biodiv_lt_sites_wdpa[!duplicated(wb_web_biodiv_lt_sites_wdpa),]
+wb_web_biodiv_lt_sites_wdpa$WDPAID <- as.numeric(as.character(wb_web_biodiv_lt_sites_wdpa$WDPAID))
+write.table(wb_web_biodiv_lt_sites_wdpa,  paste(getwd(), "/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_sites_wdpa.csv", row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
 
