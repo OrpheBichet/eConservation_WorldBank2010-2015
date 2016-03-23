@@ -225,7 +225,8 @@ write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Mai
 wb_web_biodiv_10_15_projects <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "title", 
                                                                      "project_start_date","project_end_date",
                                                                      "proj_link", "budget", "currency",
-                                                                     "update_date" , "puser","id_proj_from_postgres"))
+                                                                     "update_date" , "puser","id_proj_from_postgres",
+                                                                     "complete_content", "complete_spatinfo", "complete_auxinfo"))
 
 # II.2. Create the variables missing from the WB data needed because they are provided by other data providers
 wb_web_biodiv_10_15_projects$proj_summary <- NA
