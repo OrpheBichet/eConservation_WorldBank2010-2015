@@ -1,3 +1,6 @@
+
+setwd("E:/bicheor/econservation/eConservation_March2016")
+
 ###############   Set Working directory  ####################
 #######################################################
 setwd("~/econservation/eConservation_March2016")
@@ -62,7 +65,7 @@ trim_punct <- function (x) gsub("([,;])$", "", x)
 # I. Access, filter and clean the World Bank data
 
 # I.1. Load the data from the website
-wb_web <- read.csv("http://search.worldbank.org/api/projects/all.csv",  header=T, sep=",", quote = "", na.strings = "NA", colClasses="character")
+wb_web <- read.csv("http://search.worldbank.org/api/projects/all.csv",  header=T, sep=",", quote = "", na.strings = NA, colClasses="character")
 
 # I.2. Filter the data
 ## I.2.1. Subset only projects about Biodiversity
@@ -70,44 +73,38 @@ wb_web_biodiv <- wb_web[with(wb_web, grepl("Biodiversity",theme1)|grepl("Biodive
                                grepl("Biodiversity", theme4)|grepl("Biodiversity", theme5)|grepl("Biodiversity", theme)),]
 ## I.2.2. Remove projects that have been dropped or are still in the pipeline
 wb_web_biodiv <- subset(wb_web_biodiv, wb_web_biodiv$status %in% c("Active", "Closed"))
-## I.2.3. Extract only the projects starting in 2010-2015
+## I.2.3. Convert empty fields to NA
+wb_web_biodiv[wb_web_biodiv==""] <- NA
+## I.2.4. Extract only the projects starting in 2010-2015
+### I.2.4.1. Convert date variables to date format
+wb_web_biodiv$boardapprovaldate <- gsub("T00:00:00Z", "", wb_web_biodiv$boardapprovaldate)
+wb_web_biodiv$closingdate <- gsub("T00:00:00Z", "", wb_web_biodiv$closingdate)  
+wb_web_biodiv$boardapprovaldate <- as.Date(wb_web_biodiv$boardapprovaldate, "%Y-%m-%d")
+wb_web_biodiv$closingdate <- as.Date(wb_web_biodiv$closingdate, "%Y-%m-%d")
+### I.2.4.2. Subset the projects starting in 2010-2015
 # wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$project_start_date>="2010-01-01")
-wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$project_start_date>="2010-01-01" & wb_web_biodiv$project_start_date<="2016-02-01")
+wb_web_biodiv_10_15 <- subset(wb_web_biodiv, wb_web_biodiv$boardapprovaldate>="2010-01-01" & wb_web_biodiv$boardapprovaldate<="2016-02-01")
 
 # I.3. Clean the data
 ## I.3.1. Remove unnecessary variables
-wb_web_biodiv_10_15 <- wb_web_biodiv_10_15[,-c(4:11, 14, 17:20, 24:30, 32:36, 44:50, 51,57)]
-## I.3.2. Convert empty fields to NA
-wb_web_biodiv_10_15[wb_web_biodiv_10_15==''] <- NA
-## I.3.3. Aggregate the theme variables into one
+wb_web_biodiv_10_15 <- wb_web_biodiv_10_15[,-c(4:11, 14, 17:20, 24:30, 32:36, 44:50, 51,56, 57)]
+## I.3.2. Aggregate the theme variables into one
 wb_web_biodiv_10_15$theme <- paste(wb_web_biodiv_10_15$theme1, wb_web_biodiv_10_15$theme2, wb_web_biodiv_10_15$theme3, wb_web_biodiv_10_15$theme4, wb_web_biodiv_10_15$theme5, sep=";")
 wb_web_biodiv_10_15$theme1 <- NULL
 wb_web_biodiv_10_15$theme2 <- NULL 
 wb_web_biodiv_10_15$theme3 <- NULL
 wb_web_biodiv_10_15$theme4 <- NULL
 wb_web_biodiv_10_15$theme5 <- NULL
-## I.3.4. Rename variables
+## I.3.3. Rename variables
 wb_web_biodiv_10_15 <- rename(wb_web_biodiv_10_15, replace=c("id"="id_proj_from_provider",
-                                                 "project_name"="title",
-                                                 "boardapprovaldate"="project_start_date",
-                                                 "closingdate"="project_end_date",
-                                                 "lendprojectcost"="budget",
-                                                 "url"="proj_link"))
-## I.3.5. Convert date variables to date format
-wb_web_biodiv_10_15$project_start_date <- gsub("T00:00:00Z", "", wb_web_biodiv_10_15$project_start_date)
-wb_web_biodiv_10_15$project_end_date <- gsub("T00:00:00Z", "", wb_web_biodiv_10_15$project_end_date)  
-wb_web_biodiv_10_15$project_start_date <- as.Date(wb_web_biodiv_10_15$project_start_date, "%Y-%m-%d")
-wb_web_biodiv_10_15$project_end_date <- as.Date(wb_web_biodiv_10_15$project_end_date, "%Y-%m-%d")  
-## I.3.6. Remove semicolon in the budget variable
+                                                             "project_name"="title",
+                                                             "boardapprovaldate"="project_start_date",
+                                                             "closingdate"="project_end_date",
+                                                             "lendprojectcost"="budget",
+                                                             "url"="proj_link"))
+## I.3.4. Remove semicolon in the budget variable
 wb_web_biodiv_10_15$budget <- as.numeric(gsub(";", "", wb_web_biodiv_10_15$budget))
-## I.3.7. Within some variables, the information if duplicated. Keep only one 
-wb_web_biodiv_10_15$countryname <- as.character(wb_web_biodiv_10_15$countryname)
-s <- (strsplit(wb_web_biodiv_10_15$countryname, split = ";"))
-temp <- data.frame(id_proj_from_provider = rep(wb_web_biodiv_10_15$id_proj_from_provider, sapply(s, length)), countryname = unlist(s))
-temp <- temp[!duplicated(temp),]
-wb_web_biodiv_10_15$countryname <- NULL
-wb_web_biodiv_10_15 <- merge(wb_web_biodiv_10_15, temp, by="id_proj_from_provider", all=T)
-## I.3.8. Clean up the project titles
+## I.3.5. Clean up the project titles
 wb_web_biodiv_10_15$title <- gsub("Proejct", "Project", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("%th", "Fifth", wb_web_biodiv_10_15$title)
 wb_web_biodiv_10_15$title <- gsub("PIAU&#205;", "PIAUÍ", wb_web_biodiv_10_15$title)
@@ -139,8 +136,58 @@ wb_web_biodiv_10_15$id_proj_from_postgres <- seq(1000000, 1000000-1+nrow(wb_web_
 ## I.4.3. Convert date variables to date format
 wb_web_biodiv_10_15$update_date <- as.Date(wb_web_biodiv_10_15$update_date, "%Y-%m-%d")  
 
-# I.5. Check for missing values
+# I.5. Summary of missing values
+## I.5.1. Summary table of missing values 
 missing_wb_web_biodiv_10_15 <- propmiss(wb_web_biodiv_10_15)
+## I.5.2. Evaluate the completeness of the data per project
+### I.5.2.1.  Per Variable
+df <- data.frame(id_proj=wb_web_biodiv_10_15$id_proj_from_provider)
+df$budget <- ifelse(is.na(wb_web_biodiv_10_15$budget), 0, 1)
+df$borrower <- ifelse(is.na(wb_web_biodiv_10_15$borrower), 0, 1)
+df$impagency <- ifelse(is.na(wb_web_biodiv_10_15$impagency), 0, 1)
+df$sector <- ifelse(is.na(wb_web_biodiv_10_15$sector), 0, 1)
+df$mjsector <- ifelse(is.na(wb_web_biodiv_10_15$mjsector), 0, 1)
+df$theme <- ifelse(is.na(wb_web_biodiv_10_15$theme), 0, 1)
+df$species <- 0
+df$title <- ifelse(is.na(wb_web_biodiv_10_15$title), 0, 1)
+df$summary <- 0
+df$description <- 0
+df$donor <- 0
+df$latitude <- ifelse(is.na(wb_web_biodiv_10_15$Latitude), 0, 1)
+df$longitude <- ifelse(is.na(wb_web_biodiv_10_15$Longitude), 0, 1)
+df$sitename <- ifelse(is.na(wb_web_biodiv_10_15$GeoLocName), 0, 1)
+df$regionname <- ifelse(is.na(wb_web_biodiv_10_15$regionname), 0, 1)
+df$countryname <- ifelse(is.na(wb_web_biodiv_10_15$countryname), 0, 1)
+df$project_start_date <- ifelse(is.na(wb_web_biodiv_10_15$project_start_date), 0, 1)
+df$project_end_date <- ifelse(is.na(wb_web_biodiv_10_15$project_end_date), 0, 1)
+df$id_proj_from_provider <- ifelse(is.na(wb_web_biodiv_10_15$id_proj_from_provider), 0, 1)
+df$proj_link <- ifelse(is.na(wb_web_biodiv_10_15$proj_link), 0, 1)
+### I.5.2.2. Per needed information
+df$ni_budget <- ifelse(is.na(wb_web_biodiv_10_15$budget), 0, 1)
+df$ni_impl_agency <- ifelse(!is.na(wb_web_biodiv_10_15$borrower) | !is.na(wb_web_biodiv_10_15$impagency), 1, 0)
+df$ni_proj_focus <- ifelse(!is.na(wb_web_biodiv_10_15$title) | !is.na(wb_web_biodiv_10_15$sector) | !is.na(wb_web_biodiv_10_15$mjsector) | !is.na(wb_web_biodiv_10_15$theme), 1, 0)
+df$ni_donor <- 0
+df$ni_site_coord <- ifelse(!is.na(wb_web_biodiv_10_15$Latitude) | !is.na(wb_web_biodiv_10_15$Longitude), 1, 0)
+df$ni_site_info <- ifelse(!is.na(wb_web_biodiv_10_15$GeoLocName) | !is.na(wb_web_biodiv_10_15$regionname) | !is.na(wb_web_biodiv_10_15$countryname), 1, 0)
+df$ni_project_dates <- ifelse(is.na(wb_web_biodiv_10_15$project_start_date), 0, 1)
+df$ni_project_end_date <- ifelse(is.na(wb_web_biodiv_10_15$project_end_date), 0, 1)
+df$ni_id_proj_from_provider <- ifelse(is.na(wb_web_biodiv_10_15$id_proj_from_provider), 0, 1)
+df$ni_proj_link <- ifelse(is.na(wb_web_biodiv_10_15$proj_link), 0, 1)
+### I.5.2.3.   Per group of information
+for (i in 1:136){
+  df$content[i] <- sum(df$ni_budget[i], df$ni_impl_agency[i], df$ni_proj_focus[i], df$ni_donor[i]) / 4
+  df$spat_info[i] <- sum(df$ni_site_coord[i], df$ni_site_info[i]) /2
+  df$aux_info[i] <- sum(df$ni_project_dates[i], df$ni_project_end_date[i], df$ni_id_proj_from_provider[i], df$ni_proj_link[i]) /4
+}
+## I.5.3. Evaluate the completeness of the data per variable
+df$id_proj <- as.character(df$id_proj)
+df["Total" ,2:34] <- colSums(df["Total",2:34])
+df["Total_prop" ,2:34] <- df["Total",2:34]/136
+## I.5.3. Add a variable to the projects indicating the completness of the data
+wb_web_biodiv_10_15 <- merge(wb_web_biodiv_10_15, df[,c("id_proj","content","spat_info","aux_info")], by.x="id_proj_from_provider", by.y="id_proj")
+wb_web_biodiv_10_15 <- rename(wb_web_biodiv_10_15, replace=c("content"="complete_content",
+                                                             "spat_info"="complete_spatinfo",
+                                                             "aux_info"="complete_auxinfo"))
 
 # I.6. Complete the missing data
 ## I.6.2. Complete the missing dates
@@ -165,7 +212,7 @@ wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider==
 wb_web_biodiv_10_15$project_end_date[wb_web_biodiv_10_15$id_proj_from_provider=="P153958"] <- as.Date("2015-06-30", "%Y-%m-%d")  
 
 # I.7. Save the table as csv
-write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv"),
+write.table(wb_web_biodiv_10_15, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv", sep=""),
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 
@@ -186,12 +233,12 @@ wb_web_biodiv_10_15_projects$description <- NA
 wb_web_biodiv_10_15_projects$pcomments <- NA
 
 # II.3. Link the projects to the existing project ID in the current eConservation database
-codes_proj <- read.csv(paste(getwd(), "/eConservation_database_2014_clean\Main_tables/codes_id_proj.csv"), header=T)
+codes_proj <- read.csv(paste(getwd(), "~/econservation/eConservation_2014/eConservation_database_2014_clean/Main_tables/codes_id_proj.csv", sep=""), header=T)
 codes_proj <- rename(codes_proj, replace=c("id_proj_from_postgres"="id_proj_from_eCons"))
 wb_web_biodiv_10_15_projects <- merge(wb_web_biodiv_10_15_projects, codes_proj, by="id_proj_from_provider", all.x=T, all.y=F)
 
 # II.3. Save the project table
-write.table(wb_web_biodiv_10_15_projects, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_10_15_projects.csv"), 
+write.table(wb_web_biodiv_10_15_projects, paste(getwd(), "/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_10_15_projects.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 
@@ -204,9 +251,9 @@ write.table(wb_web_biodiv_10_15_projects, paste(getwd(), "/eConservation_WB_2010
 
 # III.1.  Clean up the implementing agencies names 
 ## III.1.1. A first cleaning of the names, one by one, needs to be done by hand in excel
-df_impl_agency <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider" ,"borrower","impl_agency"))
-write.csv(df_impl_agency, paste(getwd(), "/Temp/df_impl_agency.csv"), row.names = F) # Export to excel
-df_impl_agency <- read.csv(paste(getwd(), "/Temp/df_impl_agency.csv"), na.strings = NA,
+df_impl_agency <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider" ,"borrower","impagency"))
+write.csv(df_impl_agency, paste(getwd(), "/Temp/df_impl_agency.csv", sep=""), row.names = F) # Export to excel
+df_impl_agency <- read.csv(paste(getwd(), "/Temp/df_impl_agency.csv", sep=""), na.strings = NA,
                            header=T, sep=",", encoding="latin1")  # Load cleaned file from excel
 wb_web_biodiv_10_15 <- merge(wb_web_biodiv_10_15, df_impl_agency, by="id_proj_from_provider", all.x=T) # Include it back to the data
 
@@ -219,8 +266,8 @@ wb_web_biodiv_lt_proj_agency$impl_agency <- trim_blank(wb_web_biodiv_lt_proj_age
 ## III.2.2. Extract the unique implementing agencies from the lookup table
 wb_web_biodiv_implementing_agency <- data.frame(impl_agency = unique(wb_web_biodiv_lt_proj_agency$impl_agency))
 ## III.2.3. Complete the implementing agencies information (acronym, website, address, etc.) by hand in excel
-write.csv(wb_web_biodiv_implementing_agency, paste(getwd(), "/Temp/wb_web_biodiv_implementing_agency.csv"), row.names = F)
-wb_web_biodiv_implementing_agency <- read.csv(paste(getwd(), "/Temp/wb_web_biodiv_implementing_agency.csv"), na.strings = NA,
+write.csv(wb_web_biodiv_implementing_agency, paste(getwd(), "/Temp/wb_web_biodiv_implementing_agency.csv", sep=""), row.names = F)
+wb_web_biodiv_implementing_agency <- read.csv(paste(getwd(), "/Temp/wb_web_biodiv_implementing_agency.csv", sep=""), na.strings = NA,
                                               header=T, sep=",", encoding="latin1")
 ## III.2.4. Clean the implementing agencies table
 wb_web_biodiv_implementing_agency$impl_agency <- trim_blank(wb_web_biodiv_implementing_agency$impl_agency)
@@ -245,17 +292,18 @@ wb_web_biodiv_implementing_agency$impl_agency <- trim_blank(wb_web_biodiv_implem
 ## III.2.5. Create a unique numerical ID for the implementing agencies (starting from a number higher than the length of the current eConservation database to avoid duplicate ID)
 wb_web_biodiv_implementing_agency$id_impl_agency <- seq(2000, 2000-1+nrow(wb_web_biodiv_implementing_agency)) 
 ## III.2.6. Save the implementing agencies table
-write.table(wb_web_biodiv_implementing_agency, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_implementing_agency.csv"), 
+write.table(wb_web_biodiv_implementing_agency, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_implementing_agency.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 # III.3. Create the  lookup table project - implementing agencies. 
 ## III.3.1. Select only the ID variables and merge the table to the created numerical project ID
-wb_web_biodiv_lt_proj_agency <- subset(wb_web_biodiv_lt_proj_agency, select=c("id_proj_from_provider", "id_impl_agency"))
+wb_web_biodiv_lt_proj_agency <- merge(wb_web_biodiv_lt_proj_agency, wb_web_biodiv_implementing_agency[,c("impl_agency","id_impl_agency")])
+wb_web_biodiv_lt_proj_agency <- subset(wb_web_biodiv_lt_proj_agency, select=c(id_proj_from_provider, id_impl_agency))
 wb_web_biodiv_lt_proj_agency <- merge(wb_web_biodiv_lt_proj_agency, 
                                       subset(wb_web_biodiv_10_15_projects, select=c(id_proj_from_provider, id_proj_from_postgres)), 
                                       by="id_proj_from_provider", all.x=T, all.y=F)
 ## III.3.2. Save the lookup table
-write.table(wb_web_biodiv_lt_proj_agency, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_agency.csv"), 
+write.table(wb_web_biodiv_lt_proj_agency, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_agency.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
@@ -268,8 +316,8 @@ write.table(wb_web_biodiv_lt_proj_agency, paste(getwd(),"/eConservation_WB_2010_
 wb_web_biodiv_sites <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "id_proj_from_postgres","Latitude","Longitude"))
 ## IV.1.1. Sites without coordinates: The georeferencing was undertaken following the procedure described by Bowy. It was done in excel:
 sites_missing <- wb_web_biodiv_sites[is.na(wb_web_biodiv_sites$Latitude),] # Subset the projects without associated sites coordinates
-write.csv(sites_missing, paste(getwd(), "/Temp/sites_missing.csv", row.names = F) # Export to excel
-lt_proj_sites_missing_wb <- read.csv(paste(getwd(), "/Temp/sites_missing.csv", 
+write.csv(sites_missing, paste(getwd(), "/Temp/sites_missing.csv", sep=""), row.names = F) # Export to excel
+lt_proj_sites_missing_wb <- read.csv(paste(getwd(), "/Temp/sites_missing.csv", sep=""), 
                                      na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Load back the cleaned file
 lt_proj_sites_missing_wb$site_name <- trim_blank(lt_proj_sites_missing_wb$site_name)
 lt_proj_sites_missing_wb$geonames <- trim_blank(lt_proj_sites_missing_wb$geonames)
@@ -280,8 +328,8 @@ sites_non_missing <- subset(wb_web_biodiv_sites, !wb_web_biodiv_sites$id_proj_fr
 s3 <- (strsplit(as.character(sites_non_missing$Latitude), split = ";"))
 s4 <- (strsplit(as.character(sites_non_missing$Longitude), split = ";"))
 wb_web_biodiv_lt_proj_sites_coord <- data.frame(id_proj_from_provider = rep(sites_non_missing$id_proj_from_provider, sapply(s3, length)),
-                                          latitude = unlist(s3),
-                                          longitude = unlist(s4))
+                                                latitude = unlist(s3),
+                                                longitude = unlist(s4))
 wb_web_biodiv_lt_proj_sites_coord <- wb_web_biodiv_lt_proj_sites_coord[!duplicated(wb_web_biodiv_lt_proj_sites_coord),]
 wb_web_biodiv_lt_proj_sites_coord$latitude <- as.numeric(as.character(wb_web_biodiv_lt_proj_sites_coord$latitude))
 wb_web_biodiv_lt_proj_sites_coord$longitude <- as.numeric(as.character(wb_web_biodiv_lt_proj_sites_coord$longitude))
@@ -308,20 +356,20 @@ wb_web_biodiv_sites <- rbind(wb_web_biodiv_sites_woNA, wb_web_biodiv_sites_wNA)
 ## IV.2.2. Create a unique numerical ID for the sites (starting from a number higher than the length of the current eConservation database to avoid duplicate ID)
 wb_web_biodiv_sites$id_site_from_postgres <- seq(200000, 200000-1+nrow(wb_web_biodiv_sites)) 
 ## IV.2.3. Save the SITES table
-write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_sites.csv"), 
+write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_sites.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 # IV.3. Associate sites with countries and with WDPA, when applicable
 ## IV.3.1. Refer to code GetSiteWDPA.R
 ## IV.3.2. Clean the new SITES table 
-wb_web_biodiv_sites_POINTS <- readShapePoints(paste(getwd(),"/eConservation_GIS\WB_2010_2015_sites/wb_web_biodiv_sites_POINTS_MinDistWDPA.shp"))
+wb_web_biodiv_sites_POINTS <- readShapePoints(paste(getwd(),"/eConservation_GIS/WB_2010_2015_sites/wb_web_biodiv_sites_POINTS_MinDistWDPA.shp", sep=""))
 wb_web_biodiv_sites <- wb_web_biodiv_sites_POINTS@data
 wb_web_biodiv_sites <- rename(wb_web_biodiv_sites, replace=c("precision_"="precision_id", "wdpa_id"="inter_wdpaPOLY",
                                                              "link_to_si"="link_to_site", "id_site_fr"="id_site_from_postgres"))
-wb_web_biodiv_sites$coords_x1 <- NULL
-wb_web_biodiv_sites$coords_x2 <- NULL
+wb_web_biodiv_sites$coords_x1.1 <- NULL
+wb_web_biodiv_sites$coords_x2.1 <- NULL
 ## IV.3.3. Save the new SITES table
-write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_sites.csv"), 
+write.table(wb_web_biodiv_sites, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_sites.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 # IV.4. Create the lookup table projects - sites
@@ -337,7 +385,7 @@ wb_web_biodiv_lt_proj_sites <- wb_web_biodiv_lt_proj_sites[!duplicated(wb_web_bi
 codes_wb_sites <- subset(wb_web_biodiv_10_15, select=c("id_proj_from_provider", "id_proj_from_postgres"))
 wb_web_biodiv_lt_proj_sites <- merge(wb_web_biodiv_lt_proj_sites, codes_wb_sites, by="id_proj_from_provider", all.x=T, all.y=F)
 ## IV.4.3. Save the projects-sites lookup table
-write.table(wb_web_biodiv_lt_proj_sites, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_sites.csv"), row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
+write.table(wb_web_biodiv_lt_proj_sites, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_sites.csv", sep=""), row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
 # IV.5. Create the site-WDPA lookup table 
@@ -347,7 +395,7 @@ wb_web_biodiv_lt_sites_wdpa <- data.frame(id_site_from_postgres = rep(wb_web_bio
                                           WDPAID = unlist(s5))
 wb_web_biodiv_lt_sites_wdpa <- wb_web_biodiv_lt_sites_wdpa[!duplicated(wb_web_biodiv_lt_sites_wdpa),]
 wb_web_biodiv_lt_sites_wdpa$WDPAID <- as.numeric(as.character(wb_web_biodiv_lt_sites_wdpa$WDPAID))
-write.table(wb_web_biodiv_lt_sites_wdpa,  paste(getwd(), "/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_sites_wdpa.csv", row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
+write.table(wb_web_biodiv_lt_sites_wdpa,  paste(getwd(), "/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_sites_wdpa.csv", sep=""), row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
 
@@ -359,7 +407,7 @@ write.table(wb_web_biodiv_lt_sites_wdpa,  paste(getwd(), "/eConservation_WB_2010
 # V. Create the DONORS table
 
 # V.1. The donor information was not specified in the WB donwload data. It was completed by hand by searching online documentation of projects on the WB website
-wb_web_biodiv_donors <- read.csv(paste(getwd(), "/Temp/wb_donor.csv",
+wb_web_biodiv_donors <- read.csv(paste(getwd(), "/Temp/wb_donor.csv", sep=""),
                                  na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the table with project ID and donor names that has been completed into Excel
 
 # V.2. Create the DONORS table
@@ -370,10 +418,10 @@ wb_web_biodiv_lt_proj_donors <- data.frame(id_proj_from_provider = rep(wb_web_bi
 ## V.2.2. Extract the unique donors                                          
 wb_web_biodiv_donors <- unique(wb_web_biodiv_donors$donor_name)
 ## V.2.3. Create a unique numerical ID for the donors (starting from a number higher than the length of the current eConservation database to avoid duplicate ID)
-wb_web_biodiv_donors$id_donor <- seq(150, 150-1+nrow(wb_web_biodiv_donors)) 
+wb_web_biodiv_donors$id_donor <- seq(150, (150-1+nrow(wb_web_biodiv_donors)))
 ## V.2.4. Complete the donors information (acronym, website, address, etc.) by hand in excel
-write.csv(wb_web_biodiv_donors, paste(getwd(), "/Temp/donors_to_complete.csv", row.names = F) # Export to Excel
-wb_web_biodiv_donors <- read.csv(paste(getwd(), "/Temp/donors_to_complete.csv",
+write.csv(wb_web_biodiv_donors, paste(getwd(), "/Temp/donors_to_complete.csv", sep=""), row.names = F) # Export to Excel
+wb_web_biodiv_donors <- read.csv(paste(getwd(), "/Temp/donors_to_complete.csv", sep=""),
                                  na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table back
 ## V.2.5. Clean donors
 wb_web_biodiv_donors$donor_name <- gsub("\\|", " - ", wb_web_biodiv_donors$donor_name)
@@ -394,7 +442,7 @@ wb_web_biodiv_donors$Description <- gsub("N/A", NA, wb_web_biodiv_donors$Descrip
 wb_web_biodiv_donors$date_oldest_project <- NA
 wb_web_biodiv_donors$date_latest_project <- NA
 ## V.2.6. Save the DONORS table
-write.table(wb_web_biodiv_donors, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_donors.csv"), 
+write.table(wb_web_biodiv_donors, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/wb_web_biodiv_donors.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 # V.3. Create the lookup table projects - donors
@@ -405,7 +453,7 @@ wb_web_biodiv_lt_proj_donors <- merge(wb_web_biodiv_lt_proj_donors,
                                       subset(wb_web_biodiv_10_15_projects, select=c(id_proj_from_provider, id_proj_from_postgres)), 
                                       by="id_proj_from_provider", all.x=T, all.y=F)
 # V.3.2. Save the projects - donors lookup table
-write.table(wb_web_biodiv_lt_proj_donors,  paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_donors.csv"), 
+write.table(wb_web_biodiv_lt_proj_donors,  paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_donors.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
@@ -416,7 +464,7 @@ write.table(wb_web_biodiv_lt_proj_donors,  paste(getwd(),"/eConservation_WB_2010
 wb_web_biodiv_lt_proj_provider <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres))
 wb_web_biodiv_lt_proj_provider$id_provider <- 10  # the eConservation ID for the World Bank as a data provider is 10
 wb_web_biodiv_lt_proj_provider <- wb_web_biodiv_lt_proj_provider[!duplicated(wb_web_biodiv_lt_proj_provider),]
-write.table(wb_web_biodiv_lt_proj_provider, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_provider.csv"), 
+write.table(wb_web_biodiv_lt_proj_provider, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_provider.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
@@ -435,13 +483,13 @@ wb_web_biodiv_10_15$species_name[wb_web_biodiv_10_15$id_proj_from_provider=="P11
 wb_web_biodiv_10_15$scientific_name[wb_web_biodiv_10_15$id_proj_from_provider=="P113860"] <- "Panthera tigris"
 wb_web_biodiv_10_15$iucn_species_id[wb_web_biodiv_10_15$id_proj_from_provider=="P113860"] <- 15955
 ## VII.2.1. Save the information ono the main data table
-write.table(wb_web_biodiv_10_15, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv", 
+write.table(wb_web_biodiv_10_15, paste(getwd(),"/eConservation_WB_2010_2015/Main_tables/data_all_projects_wb_10_15.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "latin1", na = "")
 
 # VII.3. Create the project - species lookup table 
 wb_web_biodiv_lt_proj_species <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres, iucn_species_id))
 wb_web_biodiv_lt_proj_species <- wb_web_biodiv_lt_proj_species[!duplicated(wb_web_biodiv_lt_proj_species),]
-write.table(wb_web_biodiv_lt_proj_species, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_species.csv", 
+write.table(wb_web_biodiv_lt_proj_species, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_species.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 
@@ -451,23 +499,19 @@ write.table(wb_web_biodiv_lt_proj_species, paste(getwd(),"/eConservation_WB_2010
 
 ## VII.1. The project focus was not clearly indicated in the WB download data, but could be extracted by hand from the "title", “sector”, “mjsector” and “theme” variables.
 wb_web_biodiv_focus <- subset(wb_web_biodiv_10_15, select=c(id_proj_from_provider, id_proj_from_postgres, title, sector, mjsector, theme))
-write.table(wb_web_biodiv_focus, paste(getwd(), "/Temp/wb_web_biodiv_focus.csv", 
+write.table(wb_web_biodiv_focus, paste(getwd(), "/Temp/wb_web_biodiv_focus.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "NA") # Export table to Excel
-wb_web_biodiv_focus <- read.csv(paste(getwd(), "/Temp/wb_web_biodiv_focus.csv",
-                                 na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table back
+wb_web_biodiv_focus <- read.csv(paste(getwd(), "/Temp/wb_web_biodiv_focus.csv", sep=""),
+                                na.strings = NA, header=T, sep=",", dec=".", encoding="latin1") # Import the completed table back
 
 ## VII.2. Create the project - IUCN category lookup table 
 wb_web_biodiv_lt_proj_category <- subset(wb_web_biodiv_focus, select=c(id_proj_from_provider, id_proj_from_postgres, iucn_cat_id))
 wb_web_biodiv_lt_proj_category <- wb_web_biodiv_lt_proj_category[!duplicated(wb_web_biodiv_lt_proj_category),]
-write.table(wb_web_biodiv_lt_proj_category, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_category.csv", 
+write.table(wb_web_biodiv_lt_proj_category, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_category.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
 
 ## VII.3. Create the project - Aichi targets lookup table 
 wb_web_biodiv_lt_proj_aichi <- subset(wb_web_biodiv_focus, select=c(id_proj_from_provider, id_proj_from_postgres, aichi_id))
 wb_web_biodiv_lt_proj_aichi <- wb_web_biodiv_lt_proj_aichi[!duplicated(wb_web_biodiv_lt_proj_aichi),]
-write.table(wb_web_biodiv_lt_proj_aichi, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_aichi.csv", 
+write.table(wb_web_biodiv_lt_proj_aichi, paste(getwd(),"/eConservation_WB_2010_2015/Lookup_tables/wb_web_biodiv_lt_proj_aichi.csv", sep=""), 
             row.names=FALSE, sep="|", fileEncoding = "UTF-8", na = "")
-
-
-
-
